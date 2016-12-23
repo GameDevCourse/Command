@@ -18,4 +18,9 @@ class GameScene {
         }, this, 500)
     }
 
+    public stopMove(callback:Function){
+        console.log ("取消移动")
+        callback();
+    }
+
 }

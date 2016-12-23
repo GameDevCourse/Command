@@ -117,91 +117,30 @@ class Main extends egret.DisplayObjectContainer {
      * Create a game scene
      */
     private createGameScene(): void {
-        var sky: egret.Bitmap = this.createBitmapByName("bg_jpg");
+        var sky = this.createBitmapByName("bg_jpg");
         this.addChild(sky);
-        var stageW: number = this.stage.stageWidth;
-        var stageH: number = this.stage.stageHeight;
+        var stageW = this.stage.stageWidth;
+        var stageH = this.stage.stageHeight;
         sky.width = stageW;
         sky.height = stageH;
-
-        var topMask = new egret.Shape();
-        topMask.graphics.beginFill(0x000000, 0.5);
-        topMask.graphics.drawRect(0, 0, stageW, 172);
-        topMask.graphics.endFill();
-        topMask.y = 33;
-        this.addChild(topMask);
-
-        var icon: egret.Bitmap = this.createBitmapByName("egret_icon_png");
-        this.addChild(icon);
-        icon.x = 26;
-        icon.y = 33;
-
-        var line = new egret.Shape();
-        line.graphics.lineStyle(2, 0xffffff);
-        line.graphics.moveTo(0, 0);
-        line.graphics.lineTo(0, 117);
-        line.graphics.endFill();
-        line.x = 172;
-        line.y = 61;
-        this.addChild(line);
-
-
-        var colorLabel = new egret.TextField();
-        colorLabel.textColor = 0xffffff;
-        colorLabel.width = stageW - 172;
-        colorLabel.textAlign = "center";
-        colorLabel.text = "Hello Egret";
-        colorLabel.size = 24;
-        colorLabel.x = 172;
-        colorLabel.y = 80;
-        this.addChild(colorLabel);
-
-        var textfield = new egret.TextField();
-        this.addChild(textfield);
-        textfield.alpha = 0;
-        textfield.width = stageW - 172;
-        textfield.textAlign = egret.HorizontalAlign.CENTER;
-        textfield.size = 24;
-        textfield.textColor = 0xffffff;
-        textfield.x = 172;
-        textfield.y = 135;
-        this.textfield = textfield;
-
-        //根据name关键字，异步获取一个json配置文件，name属性请参考resources/resource.json配置文件的内容。
-        // Get asynchronously a json configuration file according to name keyword. As for the property of name please refer to the configuration file of resources/resource.json.
-        RES.getResAsync("description_json", this.startAnimation, this)
-
-
-
-
-
-
-        // walk(function () {
-        //     fight(function () {
-        //         walk(function () {
-        //             talk(function () {
-        //                 console.log("success")
-        //             });
-        //         })
-        //     })
-        // }
-        // );
-
-
-        function pick(callback) {
-            //
-        }
-
 
         var scene = new GameScene();
         GameScene.replaceScene(scene);
 
         var list = new CommandList();
-        list.addCommand(new WalkCommand(1,1));
-        list.addCommand(new Fight());
-        list.addCommand(new WalkCommand(3,3));
-        list.addCommand(new Talk());
+        list.addCommand(new WalkCommand(1, 1));
+        list.addCommand(new FightCommand());
+        list.addCommand(new WalkCommand(3, 3));
+        list.addCommand(new TalkCommand());
+        list.addCommand(new WalkCommand(5, 5));
         list.execute();
+
+        egret.setTimeout(function () {
+            list.cancel();
+            list.addCommand(new WalkCommand(5, 5))
+            list.execute();
+
+        }, this, 600)
 
     }
 
@@ -215,71 +154,57 @@ class Main extends egret.DisplayObjectContainer {
         result.texture = texture;
         return result;
     }
-
-    /**
-     * 描述文件加载成功，开始播放动画
-     * Description file loading is successful, start to play the animation
-     */
-    private startAnimation(result: Array<any>): void {
-        var self: any = this;
-
-        var parser = new egret.HtmlTextParser();
-        var textflowArr: Array<Array<egret.ITextElement>> = [];
-        for (var i: number = 0; i < result.length; i++) {
-            textflowArr.push(parser.parser(result[i]));
-        }
-
-        var textfield = self.textfield;
-        var count = -1;
-        var change: Function = function () {
-            count++;
-            if (count >= textflowArr.length) {
-                count = 0;
-            }
-            var lineArr = textflowArr[count];
-
-            self.changeDescription(textfield, lineArr);
-
-            var tw = egret.Tween.get(textfield);
-            tw.to({ "alpha": 1 }, 200);
-            tw.wait(2000);
-            tw.to({ "alpha": 0 }, 200);
-            tw.call(change, self);
-        };
-
-        change();
-    }
-
-    /**
-     * 切换描述内容
-     * Switch to described content
-     */
-    private changeDescription(textfield: egret.TextField, textFlow: Array<egret.ITextElement>): void {
-        textfield.textFlow = textFlow;
-    }
 }
-
 
 
 
 class CommandList {
 
+
+
     private _list: Command[] = [];
+    private currentCommand: Command;
+    private _frozen = false;
 
     addCommand(command: Command) {
         this._list.push(command);
     }
 
-    execute() {
-        var command = this._list.shift();
+    cancel() {
+        this._frozen = true;
+        var command = this.currentCommand;
+        egret.setTimeout(() => {
+            if (this._frozen) {
+                this._frozen = false;
+            }
+
+        }, this, 2000);
         if (command) {
+            command.cancel(() => {
+                this._frozen = false;
+            });
+            this._list = [];
+        }
+
+    }
+
+    execute() {
+        if (this._frozen) {
+            egret.setTimeout(this.execute, this, 100);
+            return;
+        }
+
+        var command = this._list.shift();
+        this.currentCommand = command;
+        if (command) {
+            console.log("执行下一命令", command)
             command.execute(() => {
                 this.execute()
             })
 
         }
         else {
-            console.log("success1")
+            console.log("全部命令执行完毕")
         }
     }
 
